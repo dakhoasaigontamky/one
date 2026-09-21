@@ -227,6 +227,23 @@ td.chk input,th.chk input{width:17px;height:17px;cursor:pointer}
 .tabcount{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:#C0342D;color:#fff;font-size:12px;line-height:20px;text-align:center;margin-left:6px}
 .dotcount{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#C0342D;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700}
 .empty code{background:#EEF3EF;padding:1px 6px;border-radius:5px;font-size:13px}
+
+/* ---------- bảng quản trị gọn ---------- */
+table.compact th,table.compact td{padding:9px 10px}
+table.compact td.num,table.compact th.num{width:44px}
+table.compact .nmcell{gap:8px}
+
+/* ---------- bảng quản trị gọn ---------- */
+table.compact th,table.compact td{padding:9px 10px}
+table.compact td.num,table.compact th.num{width:44px}
+table.compact .nmcell{gap:8px}
+.acts.wrap{flex-wrap:wrap;max-width:170px}
+
+/* ---------- bảng quản trị gọn ---------- */
+table.compact th,table.compact td{padding:9px 10px}
+table.compact td.num,table.compact th.num{width:44px}
+table.compact .nmcell{gap:8px}
+.acts.wrap{flex-wrap:wrap;max-width:170px}
 </style>
 </head>
 <body>
@@ -863,21 +880,23 @@ function titleBadges(t){
 function toolsTab(){
   const rows = sorted(db.tools).map(t => {
     const n = db.users.filter(u => u.role !== 'admin' && u.active && canAccess(u, t)).length;
+    const nTitles = (t.titleIds || []).filter(id => titleOf(id)).length;
+    const nx = db.users.filter(u => u.role !== 'admin' && (u.extraToolIds || []).includes(t.id)).length;
+    const tip = nTitles + ' chức danh' + (nx ? ', ' + nx + ' người cấp riêng' : '');
     const u = normUrl(t.url);
     return '<tr>'
       + '<td class="num muted">' + esc(t.no) + '</td>'
       + '<td><div class="nmcell"><span class="e" aria-hidden="true">' + esc(t.icon || '🔗') + '</span>' + esc(t.name) + '</div></td>'
-      + '<td><span class="badge" style="' + catStyle(t.category || 'Khác') + '">' + esc(t.category || 'Khác') + '</span></td>'
-      + '<td class="small">' + (hasLink(u) ? '<div class="trunc">' + esc(hostOf(u)) + '</div>' : '<span class="muted">Chưa gắn link</span>') + '</td>'
-      + '<td>' + titleBadges(t) + '</td>'
-      + '<td class="small">' + n + ' người</td>'
+      + '<td><span class="badge" style="white-space:normal;line-height:1.3;' + catStyle(t.category || 'Khác') + '">' + esc(t.category || 'Khác') + '</span></td>'
+      + '<td>' + (hasLink(u) ? '<span class="badge ok" title="' + esc(hostOf(u)) + '">Có link</span>' : '<span class="muted small" style="white-space:nowrap">Chưa gắn link</span>') + '</td>'
+      + '<td>' + ((nTitles || nx) ? '<strong title="' + esc(tip) + '">' + n + ' người</strong>' : '<span class="badge warn">Chưa cấp cho ai</span>') + '</td>'
       + '<td>' + (t.active ? '<span class="badge ok">Hiển thị</span>' : '<span class="badge gray">Đang ẩn</span>') + '</td>'
       + '<td><div class="acts"><button class="btn sm" data-act="toolEdit" data-id="' + esc(t.id) + '">Sửa</button><button class="btn sm danger" data-act="toolDel" data-id="' + esc(t.id) + '">Xóa</button></div></td></tr>';
   }).join('');
-  return '<div class="bar"><span class="muted">' + db.tools.length + ' chức năng. Khi thêm hoặc sửa, tick các chức danh được xem. Quản trị viên luôn thấy tất cả.</span>'
+  return '<div class="bar"><span class="muted">' + db.tools.length + ' chức năng. Khi thêm hoặc sửa, tick chức danh hoặc chọn người cụ thể được xem. Quản trị viên luôn thấy tất cả.</span>'
     + '<button class="btn primary" data-act="toolNew">+ Thêm chức năng</button></div>'
-    + '<div class="tbl-wrap" style="margin-top:0"><table style="min-width:980px"><thead><tr><th class="num">#</th><th>Chức năng</th><th>Nhóm</th><th>Link</th><th>Chức danh được xem</th><th>Người xem được</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
-    + (rows || '<tr><td colspan="8" class="muted" style="text-align:center;padding:24px">Chưa có chức năng nào.</td></tr>')
+    + '<div class="tbl-wrap" style="margin-top:0"><table class="compact" style="min-width:680px"><thead><tr><th class="num">#</th><th>Chức năng</th><th>Nhóm</th><th>Link</th><th>Phân quyền</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
+    + (rows || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">Chưa có chức năng nào.</td></tr>')
     + '</tbody></table></div>';
 }
 
@@ -964,17 +983,17 @@ function renderUserList(){
   const rows = slice.map(u => {
     const ex = (u.extraToolIds || []).length, bl = (u.blockedToolIds || []).length;
     const exc = (ex || bl) ? ('<span class="exc add">' + (ex ? '+' + ex : '') + '</span> <span class="exc blk">' + (bl ? '−' + bl : '') + '</span>') : '<span class="muted">-</span>';
-    const status = !u.active ? '<span class="badge gray">Đã khóa</span>' : u.mustChange ? '<span class="badge warn">Chờ đổi mật khẩu</span>' : '<span class="badge ok">Hoạt động</span>';
+    const status = !u.active ? '<span class="badge gray">Đã khóa</span>' : u.mustChange ? '<span class="badge warn" style="white-space:normal">Chờ đổi MK</span>' : '<span class="badge ok">Hoạt động</span>';
     const tname = titleName(u.titleId);
     return '<tr>'
       + '<td class="chk">' + (u.role === 'admin' ? '' : '<input type="checkbox" data-sel="' + esc(u.id) + '" aria-label="Chọn ' + esc(u.fullName) + '"' + (ui.sel.has(u.id) ? ' checked' : '') + '>') + '</td>'
       + '<td class="small">' + esc(u.username) + '</td>'
       + '<td><div style="font-weight:600">' + esc(u.fullName) + '</div>' + (u.role === 'admin' ? '<div class="small" style="color:#7D6720">Quản trị viên</div>' : '') + '</td>'
-      + '<td>' + (tname ? '<span class="badge info">' + esc(tname) + '</span>' : (u.role === 'admin' ? '<span class="muted">-</span>' : '<span class="badge warn">Chưa có</span>')) + '</td>'
+      + '<td>' + (tname ? '<span class="badge info" style="white-space:normal;line-height:1.3">' + esc(tname) + '</span>' : (u.role === 'admin' ? '<span class="muted">-</span>' : '<span class="badge warn">Chưa có</span>')) + '</td>'
       + '<td class="small">' + esc(u.dept || '') + (u.unit ? '<div class="muted">' + esc(u.unit) + '</div>' : '') + '</td>'
       + '<td class="small">' + exc + '</td>'
       + '<td>' + status + '</td>'
-      + '<td><div class="acts">'
+      + '<td><div class="acts wrap">'
       +   (u.role !== 'admin' ? '<button class="btn sm" data-act="userView" data-id="' + esc(u.id) + '">Xem thử</button>' : '')
       +   (u.id !== me().id ? '<button class="btn sm" data-act="userTempPw" data-id="' + esc(u.id) + '" title="Cấp mật khẩu tạm ngẫu nhiên">MK tạm</button>' : '')
       +   '<button class="btn sm" data-act="userEdit" data-id="' + esc(u.id) + '">Sửa</button>'
@@ -987,7 +1006,7 @@ function renderUserList(){
     + (pages > 1 ? '<div class="btns"><button class="btn sm" data-act="upage" data-p="' + (ui.upage - 1) + '"' + (ui.upage <= 1 ? ' disabled' : '') + '>Trước</button><button class="btn sm" data-act="upage" data-p="' + (ui.upage + 1) + '"' + (ui.upage >= pages ? ' disabled' : '') + '>Sau</button></div>' : '') + '</div>';
 
   el.innerHTML = selBar
-    + '<div class="tbl-wrap" style="margin-top:0"><table style="min-width:980px"><thead><tr>'
+    + '<div class="tbl-wrap" style="margin-top:0"><table class="compact" style="min-width:700px"><thead><tr>'
     + '<th class="chk"><input type="checkbox" id="selAll" aria-label="Chọn cả trang"' + (allOnPage ? ' checked' : '') + '></th>'
     + '<th>Mã NV</th><th>Họ tên</th><th>Chức danh</th><th>Khoa/Phòng</th><th>Ngoại lệ</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
     + (rows || '<tr><td colspan="8" class="muted" style="text-align:center;padding:24px">Không có người dùng phù hợp.</td></tr>')
