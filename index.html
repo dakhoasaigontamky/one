@@ -808,9 +808,11 @@ function refreshBody(){
 /* ---------- Tab Chức năng ---------- */
 function titleBadges(t){
   const names = (t.titleIds || []).map(titleName).filter(Boolean);
-  if (!names.length) return '<span class="badge warn">Chưa cấp cho chức danh nào</span>';
+  const nx = db.users.filter(u => u.role !== 'admin' && (u.extraToolIds || []).includes(t.id)).length;
+  if (!names.length && !nx) return '<span class="badge warn">Chưa cấp cho ai</span>';
   const shown = names.slice(0, 3).map(n => '<span class="badge info">' + esc(n) + '</span>').join('');
-  return '<div class="badges">' + shown + (names.length > 3 ? '<span class="badge gray">+' + (names.length - 3) + '</span>' : '') + '</div>';
+  return '<div class="badges">' + shown + (names.length > 3 ? '<span class="badge gray">+' + (names.length - 3) + '</span>' : '')
+    + (nx ? '<span class="badge ok">+' + nx + ' người riêng</span>' : '') + '</div>';
 }
 function toolsTab(){
   const rows = sorted(db.tools).map(t => {
@@ -1013,6 +1015,13 @@ function toolDialog(id){
   const cats = [...new Set(db.tools.map(x => x.category).filter(Boolean))];
   const nextNo = Math.max(0, ...db.tools.map(x => x.no || 0)) + 1;
   const have = new Set(t ? (t.titleIds || []) : []);
+  const people = db.users.filter(u => u.role !== 'admin').sort((a, b) => viSortKey(a).localeCompare(viSortKey(b), 'vi'));
+  const userById = new Map(people.map(u => [u.id, u]));
+  const ov = new Map();   // id người -> true (cấp riêng) | false (chặn riêng)
+  if (t) people.forEach(u => {
+    if ((u.extraToolIds || []).includes(t.id)) ov.set(u.id, true);
+    else if ((u.blockedToolIds || []).includes(t.id)) ov.set(u.id, false);
+  });
   const body =
     '<div class="row3">'
     + '<div class="field"><label>Số thứ tự</label><input name="no" type="number" min="1" value="' + esc(t ? t.no : nextNo) + '"></div>'
@@ -1028,24 +1037,74 @@ function toolDialog(id){
     + '<div class="field"><label>Chức danh được xem</label>'
     + (db.titles.length
       ? '<input type="search" data-cfilter placeholder="Lọc chức danh, ví dụ: bác sĩ" aria-label="Lọc chức danh" style="margin-bottom:6px">'
-        + '<div class="perm"><div class="perm-top"><strong>' + db.titles.length + ' chức danh</strong><span><button type="button" class="link" data-all="on">Chọn tất cả</button> &nbsp; <button type="button" class="link" data-all="off">Bỏ chọn</button></span></div>'
+        + '<div class="perm" style="max-height:180px"><div class="perm-top"><strong>' + db.titles.length + ' chức danh</strong><span><button type="button" class="link" data-all="on">Chọn tất cả</button> &nbsp; <button type="button" class="link" data-all="off">Bỏ chọn</button></span></div>'
         + titlesSorted().map(c => '<label data-name="' + esc(norm(c.name)) + '"><input type="checkbox" name="cid" value="' + esc(c.id) + '"' + (have.has(c.id) ? ' checked' : '') + '> ' + esc(c.name) + ' <span class="muted small">(' + db.users.filter(u => u.titleId === c.id).length + ' người)</span></label>').join('') + '</div>'
         + '<span class="hint">Khi đang lọc, nút "Chọn tất cả" và "Bỏ chọn" chỉ áp dụng cho các chức danh đang hiển thị.</span>'
       : '<span class="hint">Chưa có chức danh nào. Thêm ở tab Chức danh hoặc import người dùng.</span>')
-    + '<span class="hint">Quản trị viên luôn thấy tất cả. Ngoại lệ cho từng người chỉnh ở tab Người dùng.</span></div>';
+    + '<span class="hint">Quản trị viên luôn thấy tất cả.</span></div>'
+    + '<div class="field"><label>Cấp cho người cụ thể</label>'
+    + (people.length
+      ? '<input type="search" data-ufilter placeholder="Tìm theo tên, mã nhân viên, khoa/phòng, chức danh" aria-label="Tìm người dùng" style="margin-bottom:6px">'
+        + '<div class="perm" id="uPerm"><div class="perm-top"><strong id="uSummary"></strong><span><button type="button" class="link" data-uall="on">Chọn các mục đang hiển thị</button> &nbsp; <button type="button" class="link" data-uall="off">Bỏ chọn</button></span></div>'
+        + people.map(u => '<label data-name="' + esc(norm([u.fullName, u.username, u.dept, u.unit, titleName(u.titleId)].join(' '))) + '"><input type="checkbox" name="uid" value="' + esc(u.id) + '"> <span><strong>' + esc(u.fullName) + '</strong> <span class="muted small">' + esc(u.username) + (u.dept ? ' · ' + esc(u.dept) : '') + (titleName(u.titleId) ? ' · ' + esc(titleName(u.titleId)) : '') + '</span></span><span class="exc"></span></label>').join('') + '</div>'
+        + '<span class="hint">Gõ tên để tìm rồi tick. Người thuộc chức danh đã chọn ở trên có sẵn dấu tick (theo chức danh); bỏ tick để chặn riêng người đó. Người khác được tick sẽ được cấp riêng.</span>'
+      : '<span class="hint">Chưa có người dùng nào. Vào tab Người dùng để import.</span>')
+    + '</div>';
 
   openDialog({
     title: t ? 'Sửa chức năng' : 'Thêm chức năng',
     body,
     onOpen(d){
+      const titlesOn = () => new Set([...d.querySelectorAll('[name=cid]:checked')].map(x => x.value));
+      const baseOf = (u, on) => !!u.titleId && on.has(u.titleId);
+      function syncUsers(){
+        const on = titlesOn(); let nx = 0, nb = 0;
+        d.querySelectorAll('[name=uid]').forEach(c => {
+          const u = userById.get(c.value); if (!u) return;
+          const base = baseOf(u, on);
+          if (ov.has(c.value) && ov.get(c.value) === base) ov.delete(c.value);
+          c.checked = ov.has(c.value) ? ov.get(c.value) : base;
+          const tag = c.closest('label').querySelector('.exc');
+          if (c.checked && !base){ tag.textContent = 'cấp riêng'; tag.className = 'exc add'; nx++; }
+          else if (!c.checked && base){ tag.textContent = 'bị chặn'; tag.className = 'exc blk'; nb++; }
+          else if (c.checked){ tag.textContent = 'theo chức danh'; tag.className = 'exc'; }
+          else { tag.textContent = ''; tag.className = 'exc'; }
+        });
+        const sm = d.querySelector('#uSummary');
+        if (sm) sm.textContent = nx + ' người được cấp riêng' + (nb ? ', ' + nb + ' người bị chặn' : '');
+      }
+      syncUsers();
       d.addEventListener('click', ev => {
         const b = ev.target.closest('[data-all]');
-        if (b) d.querySelectorAll('[name=cid]').forEach(c => { if (!c.closest('label').hidden) c.checked = b.dataset.all === 'on'; });
+        if (b){ d.querySelectorAll('[name=cid]').forEach(c => { if (!c.closest('label').hidden) c.checked = b.dataset.all === 'on'; }); syncUsers(); return; }
+        const ub = ev.target.closest('[data-uall]');
+        if (ub){
+          const on = titlesOn(), val = ub.dataset.uall === 'on';
+          d.querySelectorAll('[name=uid]').forEach(c => {
+            if (c.closest('label').hidden) return;
+            const u = userById.get(c.value); if (!u) return;
+            if (baseOf(u, on) === val) ov.delete(c.value); else ov.set(c.value, val);
+          });
+          syncUsers();
+        }
+      });
+      d.addEventListener('change', ev => {
+        const el = ev.target;
+        if (el.name === 'cid') syncUsers();
+        else if (el.name === 'uid'){
+          const u = userById.get(el.value); if (!u) return;
+          if (baseOf(u, titlesOn()) === el.checked) ov.delete(el.value); else ov.set(el.value, el.checked);
+          syncUsers();
+        }
       });
       d.addEventListener('input', ev => {
-        if (!ev.target.matches('[data-cfilter]')) return;
-        const q = norm(ev.target.value);
-        d.querySelectorAll('[name=cid]').forEach(c => { const lb = c.closest('label'); lb.hidden = !!q && !lb.dataset.name.includes(q); });
+        if (ev.target.matches('[data-cfilter]')){
+          const q = norm(ev.target.value);
+          d.querySelectorAll('[name=cid]').forEach(c => { const lb = c.closest('label'); lb.hidden = !!q && !lb.dataset.name.includes(q); });
+        } else if (ev.target.matches('[data-ufilter]')){
+          const q = norm(ev.target.value);
+          d.querySelectorAll('[name=uid]').forEach(c => { const lb = c.closest('label'); lb.hidden = !!q && !lb.dataset.name.includes(q); });
+        }
       });
     },
     async onSave(d){
@@ -1058,19 +1117,36 @@ function toolDialog(id){
       const rawUrl = v('url');
       const url = normUrl(rawUrl);
       if (rawUrl && !url) return 'Link không hợp lệ.';
+      const titleIds = [...d.querySelectorAll('[name=cid]:checked')].map(x => x.value);
+      const onSet = new Set(titleIds);
+      const extraUserIds = [], blockedUserIds = [];
+      d.querySelectorAll('[name=uid]').forEach(c => {
+        const u = userById.get(c.value); if (!u) return;
+        const base = !!u.titleId && onSet.has(u.titleId);
+        if (c.checked && !base) extraUserIds.push(u.id);
+        if (!c.checked && base) blockedUserIds.push(u.id);
+      });
       if (SERVER){
         const r = await call('onemsg_admin_save_tool', { p_token: ui.token, p_tool: {
           id: t ? t.id : null, no, icon: v('icon') || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác',
-          active: v('active') === '1', titleIds: [...d.querySelectorAll('[name=cid]:checked')].map(x => x.value) } });
+          active: v('active') === '1', titleIds, extraUserIds, blockedUserIds } });
         if (!r.ok) return r.error;
-        await loadAdmin(); render(); toast('Đã lưu chức năng');
+        await loadAdmin(); render();
+        if (r.v !== 2 && (extraUserIds.length || blockedUserIds.length)) toast('Đã lưu chức năng nhưng CHƯA lưu được người cụ thể: cần chạy file supabase_update_1.sql trong SQL Editor.');
+        else toast('Đã lưu chức năng');
         return '';
       }
       let tool = t;
       if (!tool){ tool = { id: uid() }; db.tools.push(tool); }
       Object.assign(tool, {
         no, icon: v('icon') || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác', active: v('active') === '1',
-        titleIds: [...d.querySelectorAll('[name=cid]:checked')].map(x => x.value)
+        titleIds
+      });
+      people.forEach(u => {
+        u.extraToolIds = (u.extraToolIds || []).filter(x => x !== tool.id);
+        u.blockedToolIds = (u.blockedToolIds || []).filter(x => x !== tool.id);
+        if (extraUserIds.includes(u.id)) u.extraToolIds.push(tool.id);
+        if (blockedUserIds.includes(u.id)) u.blockedToolIds.push(tool.id);
       });
       save(); render(); toast('Đã lưu chức năng');
       return '';
