@@ -27,7 +27,7 @@
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;font-family:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--paper);color:var(--text);font-size:15px;line-height:1.5}
+body{margin:0;font-family:'iCiel Graphik','iCiel Graphit','Graphik','Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--paper);color:var(--text);font-size:15px;line-height:1.5}
 button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4,p{margin:0}
 a{color:inherit}
@@ -244,6 +244,15 @@ table.compact th,table.compact td{padding:9px 10px}
 table.compact td.num,table.compact th.num{width:44px}
 table.compact .nmcell{gap:8px}
 .acts.wrap{flex-wrap:wrap;max-width:170px}
+
+/* ---------- gọn gàng: không icon, tên là hyperlink ---------- */
+.lnk{color:var(--brand-d);font-weight:600;line-height:1.35;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:rgba(0,122,59,.35);cursor:pointer}
+.lnk:hover{color:var(--brand-dark);text-decoration-color:currentColor}
+.lnk[data-act=nolink]{color:var(--muted);text-decoration-color:rgba(88,112,98,.35)}
+.lnk.stretched::after{content:'';position:absolute;inset:0;border-radius:11px}
+.tile{display:block;min-height:0;padding:14px 44px 14px 14px}
+.tile:hover{border-color:var(--c)}
+.tile .ds{display:-webkit-box;margin-top:4px;color:var(--muted);font-size:13px;line-height:1.4;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 </style>
 </head>
 <body>
@@ -781,7 +790,7 @@ function renderPortal(){
     + viewAsBanner
     + '<p class="hello">Xin chào, <strong>' + esc(u.fullName) + '</strong>. Bạn có <strong>' + list.length + '</strong> chức năng.</p>'
     + '<div class="toolbar">'
-    +   '<div class="search">' + ICON.search + '<input id="q" type="search" placeholder="Tìm chức năng theo tên, nhóm hoặc số thứ tự" value="' + esc(ui.q) + '" aria-label="Tìm chức năng"></div>'
+    +   '<div class="search">' + ICON.search + '<input id="q" type="search" placeholder="Tìm theo tên, chức năng hoặc số thứ tự" value="' + esc(ui.q) + '" aria-label="Tìm chức năng"></div>'
     +   '<div class="seg" role="group" aria-label="Kiểu hiển thị">'
     +     '<button data-act="view" data-view="cards" aria-pressed="' + (ui.view === 'cards') + '">' + ICON.grid + 'Thẻ</button>'
     +     '<button data-act="view" data-view="table" aria-pressed="' + (ui.view === 'table') + '">' + ICON.list + 'Bảng</button>'
@@ -810,7 +819,7 @@ function renderResults(){
     return;
   }
   if (!list.length){
-    el.innerHTML = '<div class="empty"><strong>Không tìm thấy chức năng phù hợp</strong>Thử từ khóa khác hoặc chọn nhóm "Tất cả".</div>';
+    el.innerHTML = '<div class="empty"><strong>Không tìm thấy chức năng phù hợp</strong>Thử từ khóa khác hoặc chọn "Tất cả".</div>';
     return;
   }
   el.innerHTML = ui.view === 'table' ? tableHtml(list) : cardsHtml(list);
@@ -821,10 +830,10 @@ function linkAttrs(t){
   return hasLink(u) ? 'href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' : 'href="#" data-act="nolink"';
 }
 function tileHtml(t){
-  return '<a class="tile" ' + linkAttrs(t) + ' title="' + esc(t.name) + '">'
-    + '<span class="ico" aria-hidden="true">' + esc(t.icon || '🔗') + '</span>'
-    + '<span class="tx"><span class="nm">' + esc(t.name) + '</span><span class="ds">' + esc(t.desc) + '</span></span>'
-    + '<span class="no">#' + esc(t.no) + '</span></a>';
+  return '<div class="tile">'
+    + '<a class="lnk stretched" ' + linkAttrs(t) + '>' + esc(t.name) + '</a>'
+    + (t.desc ? '<span class="ds">' + esc(t.desc) + '</span>' : '')
+    + '<span class="no">#' + esc(t.no) + '</span></div>';
 }
 function cardsHtml(list){
   return [...groupBy(list, t => t.category || 'Khác')].map(([c, items]) =>
@@ -833,13 +842,12 @@ function cardsHtml(list){
     + '<div class="grid">' + items.map(tileHtml).join('') + '</div></section>').join('');
 }
 function tableHtml(list){
-  return '<div class="tbl-wrap"><table><thead><tr><th class="num">#</th><th>Tên chức năng</th><th>Nhóm</th><th>Mô tả</th><th></th></tr></thead><tbody>'
+  return '<div class="tbl-wrap"><table><thead><tr><th class="num">#</th><th>Tên</th><th>Chức năng</th><th>Mô tả</th></tr></thead><tbody>'
     + list.map(t =>
       '<tr><td class="num muted">' + esc(t.no) + '</td>'
-      + '<td><a class="nmcell" style="text-decoration:none" ' + linkAttrs(t) + '><span class="e" aria-hidden="true">' + esc(t.icon || '🔗') + '</span>' + esc(t.name) + '</a></td>'
+      + '<td><a class="lnk" ' + linkAttrs(t) + '>' + esc(t.name) + '</a></td>'
       + '<td><span class="badge" style="' + catStyle(t.category || 'Khác') + '">' + esc(t.category || 'Khác') + '</span></td>'
-      + '<td class="muted small">' + esc(t.desc) + '</td>'
-      + '<td style="text-align:right"><a class="btn sm primary" ' + linkAttrs(t) + '>Mở ' + ICON.ext + '</a></td></tr>').join('')
+      + '<td class="muted small">' + esc(t.desc) + '</td></tr>').join('')
     + '</tbody></table></div>';
 }
 
@@ -886,7 +894,7 @@ function toolsTab(){
     const u = normUrl(t.url);
     return '<tr>'
       + '<td class="num muted">' + esc(t.no) + '</td>'
-      + '<td><div class="nmcell"><span class="e" aria-hidden="true">' + esc(t.icon || '🔗') + '</span>' + esc(t.name) + '</div></td>'
+      + '<td><div class="nmcell">' + esc(t.name) + '</div></td>'
       + '<td><span class="badge" style="white-space:normal;line-height:1.3;' + catStyle(t.category || 'Khác') + '">' + esc(t.category || 'Khác') + '</span></td>'
       + '<td>' + (hasLink(u) ? '<span class="badge ok" title="' + esc(hostOf(u)) + '">Có link</span>' : '<span class="muted small" style="white-space:nowrap">Chưa gắn link</span>') + '</td>'
       + '<td>' + ((nTitles || nx) ? '<strong title="' + esc(tip) + '">' + n + ' người</strong>' : '<span class="badge warn">Chưa cấp cho ai</span>') + '</td>'
@@ -895,7 +903,7 @@ function toolsTab(){
   }).join('');
   return '<div class="bar"><span class="muted">' + db.tools.length + ' chức năng. Khi thêm hoặc sửa, tick chức danh hoặc chọn người cụ thể được xem. Quản trị viên luôn thấy tất cả.</span>'
     + '<button class="btn primary" data-act="toolNew">+ Thêm chức năng</button></div>'
-    + '<div class="tbl-wrap" style="margin-top:0"><table class="compact" style="min-width:680px"><thead><tr><th class="num">#</th><th>Chức năng</th><th>Nhóm</th><th>Link</th><th>Phân quyền</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
+    + '<div class="tbl-wrap" style="margin-top:0"><table class="compact" style="min-width:680px"><thead><tr><th class="num">#</th><th>Tên</th><th>Chức năng</th><th>Link</th><th>Phân quyền</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
     + (rows || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">Chưa có chức năng nào.</td></tr>')
     + '</tbody></table></div>';
 }
@@ -908,7 +916,7 @@ function matrixTab(){
   const head = '<tr><th>Chức năng</th>' + titles.map(c =>
     '<th data-col="' + esc(c.id) + '">' + esc(c.name) + '<button class="link" data-act="matCol" data-id="' + esc(c.id) + '">Cả cột</button></th>').join('') + '</tr>';
   const rows = sorted(db.tools).map(t =>
-    '<tr><td><div class="nmcell"><span class="e" aria-hidden="true">' + esc(t.icon || '🔗') + '</span><span>' + esc(t.name) + '<div class="catline">#' + esc(t.no) + ' · ' + esc(t.category || 'Khác') + (t.active ? '' : ' · đang ẩn') + '</div></span></div></td>'
+    '<tr><td><div class="nmcell"><span>' + esc(t.name) + '<div class="catline">#' + esc(t.no) + ' · ' + esc(t.category || 'Khác') + (t.active ? '' : ' · đang ẩn') + '</div></span></div></td>'
     + titles.map(c => '<td class="cellchk" data-col="' + esc(c.id) + '"><input type="checkbox" data-mat data-t="' + esc(t.id) + '" data-c="' + esc(c.id) + '" aria-label="' + esc(t.name + ' - ' + c.name) + '"' + ((t.titleIds || []).includes(c.id) ? ' checked' : '') + '></td>').join('')
     + '</tr>').join('');
   return '<div class="bar"><span class="muted">Tick để cho phép chức danh xem chức năng. Thay đổi được lưu ngay. Ngoại lệ từng người chỉnh ở tab Người dùng.</span>'
@@ -1105,15 +1113,14 @@ function toolDialog(id){
     else if ((u.blockedToolIds || []).includes(t.id)) ov.set(u.id, false);
   });
   const body =
-    '<div class="row3">'
+    '<div class="row3" style="grid-template-columns:120px 1fr">'
     + '<div class="field"><label>Số thứ tự</label><input name="no" type="number" min="1" value="' + esc(t ? t.no : nextNo) + '"></div>'
-    + '<div class="field"><label>Biểu tượng</label><input name="icon" maxlength="8" value="' + esc(t ? t.icon : '🔗') + '"></div>'
-    + '<div class="field"><label>Tên chức năng *</label><input name="name" value="' + esc(t ? t.name : '') + '"></div>'
+    + '<div class="field"><label>Tên *</label><input name="name" value="' + esc(t ? t.name : '') + '"></div>'
     + '</div>'
     + '<div class="field"><label>Mô tả ngắn</label><textarea name="desc" maxlength="200">' + esc(t ? t.desc : '') + '</textarea></div>'
     + '<div class="field"><label>Link chức năng</label><input name="url" placeholder="https://..." value="' + esc(t ? t.url : '') + '"><span class="hint">Bỏ trống nếu chưa có link. Người dùng bấm vào sẽ thấy thông báo "chưa gắn link".</span></div>'
     + '<div class="row2">'
-    + '<div class="field"><label>Nhóm chức năng</label><input name="category" list="catlist" value="' + esc(t ? t.category : '') + '" placeholder="Ví dụ: BHYT"><datalist id="catlist">' + cats.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></div>'
+    + '<div class="field"><label>Chức năng</label><input name="category" list="catlist" value="' + esc(t ? t.category : '') + '" placeholder="Ví dụ: BHYT"><datalist id="catlist">' + cats.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></div>'
     + '<div class="field"><label>Trạng thái</label><select name="active"><option value="1"' + (!t || t.active ? ' selected' : '') + '>Hiển thị</option><option value="0"' + (t && !t.active ? ' selected' : '') + '>Ẩn tạm thời</option></select></div>'
     + '</div>'
     + '<div class="field"><label>Chức danh được xem</label>'
@@ -1210,7 +1217,7 @@ function toolDialog(id){
       });
       if (SERVER){
         const r = await call('onemsg_admin_save_tool', { p_token: ui.token, p_tool: {
-          id: t ? t.id : null, no, icon: v('icon') || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác',
+          id: t ? t.id : null, no, icon: (t && t.icon) || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác',
           active: v('active') === '1', titleIds, extraUserIds, blockedUserIds } });
         if (!r.ok) return r.error;
         await loadAdmin(); render();
@@ -1221,7 +1228,7 @@ function toolDialog(id){
       let tool = t;
       if (!tool){ tool = { id: uid() }; db.tools.push(tool); }
       Object.assign(tool, {
-        no, icon: v('icon') || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác', active: v('active') === '1',
+        no, icon: (t && t.icon) || '🔗', name, desc: v('desc'), url, category: v('category') || 'Khác', active: v('active') === '1',
         titleIds
       });
       people.forEach(u => {
@@ -1277,7 +1284,7 @@ function userDialog(id){
     + '<div class="perm">'
     + ([...groups].map(([c, items]) =>
         '<div class="perm-group"><h4><span>' + esc(c) + '</span><span><button type="button" class="link" data-grp="on">Chọn cả nhóm</button> &nbsp; <button type="button" class="link" data-grp="off">Bỏ</button></span></h4>'
-        + items.map(t => '<label><input type="checkbox" name="tid" value="' + esc(t.id) + '"> <span aria-hidden="true">' + esc(t.icon || '') + '</span> ' + esc(t.name) + (t.active ? '' : ' <span class="muted small">(đang ẩn)</span>') + '<span class="exc" data-exc="' + esc(t.id) + '"></span></label>').join('')
+        + items.map(t => '<label><input type="checkbox" name="tid" value="' + esc(t.id) + '"> ' + esc(t.name) + (t.active ? '' : ' <span class="muted small">(đang ẩn)</span>') + '<span class="exc" data-exc="' + esc(t.id) + '"></span></label>').join('')
         + '</div>').join('') || '<span class="hint">Chưa có chức năng nào.</span>')
     + '</div>';
 
